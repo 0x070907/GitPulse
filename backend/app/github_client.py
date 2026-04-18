@@ -1,7 +1,7 @@
 import os
 import httpx
 from dotenv import load_dotenv
-from app.schemas import GitHubUser,GitHubRepo
+from app.schemas import GitHubUser,GitHubRepo,GitHubEvent
 from fastapi import HTTPException
 from typing import Literal,Optional
 
@@ -19,20 +19,50 @@ async def fetch_user(username : str) -> GitHubUser:
             raise HTTPException(status_code=404, detail="User not found")
 
         if response.status_code == 403:
-            raise HTTPException(status_code=429, detail="Rate limit exceeded")
+            raise HTTPException(status_code=429, detail="Rate limit exceeded.Please try again in an hour.")
 
         data = response.json()   # response can't be passed to model directly
         return GitHubUser(**data)    
 
 #fetches all the public repos of the user and returns only the fields in GitHubRepo model for every repo as a list
-async def fetch_repos(username : str,repo_type : str = "owner",per_page : int = 100,sort : Literal["created","updated","full_name","pushed"] = "updated") -> list[GitHubRepo]:
+async def fetch_repos(username : str,
+                    repo_type : str = "owner",
+                    per_page : int = 100,
+                    sort : Literal["created","updated","full_name","pushed"] = "updated") -> list[GitHubRepo]:
+
     async with httpx.AsyncClient() as client:    
         response = await client.get("https://api.github.com/users/{}/repos?type={}&per_page={}&sort={}".format(username,repo_type,per_page,sort),headers = headers)
 
         if response.status_code == 404:
             raise HTTPException(status_code=404,detail = "User not found")
 
+        #
+        if response.status_code == 403:
+            reset_time = response.headers.get("x-ratelimit-reset")
+            
+            raise HTTPException(status_code=429, detail=f"Limit resets at {reset_time}")
+
         repos = response.json()
         if response.status_code == 200 and not repos:   #If the user exists but has no public repos,just return an empty list
             return []
+
         return [GitHubRepo(**repo) for repo in repos]
+
+#fetch only required type of events
+async def fetch_events(username : str, per_page : int = 100) -> list[GitHubEvent]:
+    async with httpx.AsyncClient() as client:
+        response = await client.get("https://api.github.com/users/{}/events?per_page={}".format(username,per_page),headers = headers)
+
+        if response.status_code == 404:
+            raise HTTPException(status_code=404,detail = "User not found")
+
+        if response.status_code == 403:
+            raise HTTPException(status_code=429,detail="Rate Limit Exceeded.Please try again in an hour.")
+
+        events = response.json()
+        
+        if response.status_code == 200 and not events:
+            return []
+
+        ALLOWED_EVENT_TYPES = ["PushEvent","PullRequestEvent","IssuesEvent","IssueCommentEvent"]
+        return [GitHubEvent(**event) for event in events if event.get("type","") in ALLOWED_EVENT_TYPES]
