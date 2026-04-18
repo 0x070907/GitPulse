@@ -2,8 +2,9 @@
 from fastapi import FastAPI,Path,Query
 from typing import Annotated
 from app.github_client import fetch_user,fetch_repos,fetch_events
-from app.schemas import GitHubUser,GitHubRepo,GitHubEvent
+from app.schemas import GitHubUser,GitHubRepo,GitHubEvent,DashBoardResponse
 from typing import Literal
+import asyncio
 
 app = FastAPI(title="GitPulse")
 
@@ -11,6 +12,8 @@ app = FastAPI(title="GitPulse")
 def health():
     return {"status" : "ok","message":"GitPulse is running"}  
 
+#These routes are working perfect individually when tested,now we can combine them using asyncio.gather()
+"""
 @app.get("/user/{username}",response_model = GitHubUser )
 async def get_user( username : Annotated[str,Path(description="Enter a github username")] ):
     return await fetch_user(username)
@@ -25,3 +28,10 @@ async def get_repos(username : str,
 @app.get("/user/{username}/events",response_model=list[GitHubEvent])
 async def get_events(username : str,per_page : int = Query(default=100,gt=0,le=100)):
     return await fetch_events(username,per_page)
+"""
+
+#we'll fetch all data at once and analyse it
+@app.get("/analyse/{username}/dashboard")
+async def analyse_profile(username : str):
+    return await asyncio.gather(fetch_user(username),fetch_repos(username),fetch_events(username))
+    

@@ -43,3 +43,5 @@ class GitHubEvent(BaseModel):
     created_at : str
     repo : Repo  #we only need repo["name"]
 
+class DashBoardResponse(BaseModel):
+    pass
