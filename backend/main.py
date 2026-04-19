@@ -2,7 +2,7 @@
 from fastapi import FastAPI,Path,Query
 from typing import Annotated,Literal
 from app.github_client import fetch_user,fetch_repos,fetch_events
-from app.schemas import GitHubUser,GitHubRepo,GitHubEvent,DashBoardResponse,RepoStats
+from app.schemas import *
 from app.utils import *
 import asyncio
 
@@ -39,6 +39,10 @@ async def analyse_profile(username : str):
 
     lang_analysis = calculate_language_breakdown(repos)
 
+    repos_with_scores = calculate_repo_quality_score(repos)
+
+    top_repos = get_top_repos(repos_with_scores)
+
     return DashBoardResponse(profile = user,
-                            repositories = repos,
-                            repo_stats = RepoStats(total_stars = stars,total_forks = forks,language_breakdown = lang_analysis))
+                            repositories = repos_with_scores,
+                            repo_stats = RepoStats(total_stars = stars,total_forks = forks,language_breakdown = lang_analysis,top_repositories = top_repos))

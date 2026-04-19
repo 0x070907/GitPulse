@@ -1,5 +1,5 @@
 from typing import Tuple
-from app.schemas import GitHubRepo,LanguageBreakdown
+from app.schemas import GitHubRepo,LanguageBreakdown,RepoWithScore
 from collections import Counter
 
 def calculate_stars_and_forks(repos : list[GitHubRepo]) -> Tuple[int,int]:
@@ -14,7 +14,7 @@ def calculate_stars_and_forks(repos : list[GitHubRepo]) -> Tuple[int,int]:
     return total_stars,total_forks
 
 def calculate_language_breakdown(repos : list[GitHubRepo]) -> list[LanguageBreakdown]:
-    """"Optimized language analysis by aggregating primary language data and avoiding redundant API calls."""
+    """Optimized language analysis by aggregating primary language data and avoiding redundant API calls."""
 
     original_repos = [repo for repo in repos if not repo.fork]
     if not original_repos:
@@ -30,3 +30,25 @@ def calculate_language_breakdown(repos : list[GitHubRepo]) -> list[LanguageBreak
 
     return sorted(breakdown, key=lambda l: l.percentage, reverse=True) # Sort by percentage descending
     
+def calculate_repo_quality_score(repos : list[GitHubRepo]) -> list[RepoWithScore]:
+    """ Calculate repo_quality_score for each repo"""
+    repos_with_scores = []
+
+    for repo in repos:
+        score = 0
+        score += min(repo.stars * 5, 25) # 2 points per star,capped at 25
+        score += min(repo.forks * 5,25)
+        score += 10 if repo.description else 0
+        score += min(len(repo.topics) * 2, 20) # 2 points per topic, capped at 20
+        score += 10 if repo.license else 0
+        score = score + 10 if not repo.fork else score*0.2
+
+        score = min(score,100) 
+
+        repos_with_scores.append(RepoWithScore(repo = repo,quality_score = score))
+
+    return sorted(repos_with_scores,key = lambda r : r.quality_score,reverse=True)  #Sort the repos based on their scores
+    
+def get_top_repos(repos : list[RepoWithScore],n : int = 4) -> list[RepoWithScore]:
+    """Returns the top 4 repositories based on repo_quality_score"""
+    return repos[:n]

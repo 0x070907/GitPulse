@@ -50,12 +50,17 @@ class LanguageBreakdown(BaseModel):
     language : str
     percentage : float
 
+class RepoWithScore(BaseModel):
+    repo : GitHubRepo
+    quality_score : int = 0
+
 class RepoStats(BaseModel):
     total_stars : int
     total_forks : int
     language_breakdown: list[LanguageBreakdown]
+    top_repositories : list[RepoWithScore]
 
 class DashBoardResponse(BaseModel):
     profile : GitHubUser
-    repositories : list[GitHubRepo]
+    repositories : list[RepoWithScore]
     repo_stats: RepoStats
