@@ -1,9 +1,9 @@
 #This file receives the request, calls a function from another file, and returns the final JSON response to the user.
 from fastapi import FastAPI,Path,Query
-from typing import Annotated
+from typing import Annotated,Literal
 from app.github_client import fetch_user,fetch_repos,fetch_events
-from app.schemas import GitHubUser,GitHubRepo,GitHubEvent,DashBoardResponse
-from typing import Literal
+from app.schemas import GitHubUser,GitHubRepo,GitHubEvent,DashBoardResponse,RepoStats
+from app.utils import *
 import asyncio
 
 app = FastAPI(title="GitPulse")
@@ -31,7 +31,14 @@ async def get_events(username : str,per_page : int = Query(default=100,gt=0,le=1
 """
 
 #we'll fetch all data at once and analyse it
-@app.get("/analyse/{username}/dashboard")
+@app.get("/analyse/{username}/dashboard",response_model = DashBoardResponse)
 async def analyse_profile(username : str):
-    return await asyncio.gather(fetch_user(username),fetch_repos(username),fetch_events(username))
+    user, repos, events =  await asyncio.gather(fetch_user(username),fetch_repos(username),fetch_events(username))
     
+    stars ,forks = calculate_stars_and_forks(repos)
+
+    lang_analysis = calculate_language_breakdown(repos)
+
+    return DashBoardResponse(profile = user,
+                            repositories = repos,
+                            repo_stats = RepoStats(total_stars = stars,total_forks = forks,language_breakdown = lang_analysis))

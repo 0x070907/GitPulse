@@ -16,6 +16,7 @@ class GitHubUser(BaseModel):
     email : Optional[str] = None
     twitter_username: Optional[str] = None
 
+#this serves GitHubRepo model
 class License(BaseModel):
     key : str
     name : str
@@ -28,13 +29,14 @@ class GitHubRepo(BaseModel):
     topics : list[str] = []
     updated_at : str
     license : Optional[License] = None
-    stargazers_count : Annotated[int,Field(description="Total stars for repo")] 
+    stars : Annotated[int,Field(description="Total stars for repo",validation_alias="stargazers_count")] 
     language : Optional[str] = None  #this just gives the primary lang,but for lang breakdown u need to fetch the langs from languages_url,
                                      #that would again make 51 api calls if the user has 50 repos,which is a huge mess!!!!!
     '''
     #later,we can implement db as mentioned in issue #15 
     languages_url : str
     '''
+#this serves GitHubEvent
 class Repo(BaseModel):
     name : str
 
@@ -43,5 +45,17 @@ class GitHubEvent(BaseModel):
     created_at : str
     repo : Repo  #we only need repo["name"]
 
+#this serves RepoStats
+class LanguageBreakdown(BaseModel):
+    language : str
+    percentage : float
+
+class RepoStats(BaseModel):
+    total_stars : int
+    total_forks : int
+    language_breakdown: list[LanguageBreakdown]
+
 class DashBoardResponse(BaseModel):
-    pass
+    profile : GitHubUser
+    repositories : list[GitHubRepo]
+    repo_stats: RepoStats
