@@ -9,7 +9,8 @@ class GitHubUser(BaseModel):
     id : int
     location : Optional[str] = None
     public_repos: int
-    followers : int
+    followers : int    
+    html_url : str
     avatar_url: str
     created_at : str
     updated_at : str
@@ -28,6 +29,7 @@ class GitHubRepo(BaseModel):
     forks : Annotated[int,Field(description="Total forks for repo")]  
     topics : list[str] = []
     updated_at : str
+    html_url : str
     license : Optional[License] = None
     stars : Annotated[int,Field(description="Total stars for repo",validation_alias="stargazers_count")] 
     language : Optional[str] = None  #this just gives the primary lang,but for lang breakdown u need to fetch the langs from languages_url,
@@ -41,9 +43,10 @@ class Repo(BaseModel):
     name : str
 
 class GitHubEvent(BaseModel):
-    type : Annotated[Literal["PushEvent","PullRequestEvent","IssuesEvent","IssueCommentEvent"],Field(description = "Event is any one of these")]
+    type : Annotated[str,Field(description = "Event type")]
     created_at : str
     repo : Repo  #we only need repo["name"]
+    payload : dict  #this is polymorphic,hence the structure varies for different events
 
 #this serves RepoStats
 class LanguageBreakdown(BaseModel):

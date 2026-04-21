@@ -14,7 +14,7 @@ headers = {"Authorization": f"Bearer {os.getenv('GITHUB_TOKEN')}"}
 #Calculates the reset time for making authorized requests after rate limit exceeds
 def calculate_reset_time(response : httpx.Response) -> Optional[str]:
 
-    timestamp = response.headers.get("x-ratelimit-reset")  #returns a Unix timestamp as a str
+    timestamp = response.headers.get("x-ratelimit-reset")  #returns a Unix timestamp as a string
     if not timestamp:  #if 403 wasn't bcz of rate limit
         return None
     reset_time = datetime.fromtimestamp(int(timestamp)).strftime("%I:%M %p")
@@ -56,10 +56,11 @@ async def fetch_repos(username : str,
 
         return [GitHubRepo(**repo) for repo in repos]
 
-#fetch only required type of events
-async def fetch_events(username : str, per_page : int = 100) -> list[GitHubEvent]:
+#fetch all types of events,we'll filter based on requirement
+#This gives almost 1 month user activity and a max ~300 events
+async def fetch_events(username : str, per_page : int = 100,page : int = 1) -> list[GitHubEvent]:
     async with httpx.AsyncClient() as client:
-        response = await client.get("https://api.github.com/users/{}/events?per_page={}".format(username,per_page),headers = headers)
+        response = await client.get("https://api.github.com/users/{}/events?per_page={}&page={}".format(username,per_page,page),headers = headers)
 
         if response.status_code == 404:
             raise HTTPException(status_code=404,detail = "User not found")
@@ -68,9 +69,22 @@ async def fetch_events(username : str, per_page : int = 100) -> list[GitHubEvent
             raise HTTPException(status_code=429, detail=f"Limit resets at {calculate_reset_time(response)}")
 
         events = response.json()
-        
+        print(len(events))
+
         if response.status_code == 200 and not events: 
             return []
 
-        ALLOWED_EVENT_TYPES = ["PushEvent","PullRequestEvent","IssuesEvent","IssueCommentEvent"]
-        return [GitHubEvent(**event) for event in events if event.get("type","") in ALLOWED_EVENT_TYPES]
+        return [GitHubEvent(**event) for event in events]    
+
+"""
+Types of events returned by GitHub RestAPI:
+PushEvent — if user ran git push (not the same as individual commits inside a push)
+PullRequestEvent — PR opened/closed/merged
+IssuesEvent — issue opened/closed
+IssueCommentEvent — comment posted on an issue
+CreateEvent — branch or repo created
+DeleteEvent — branch deleted
+WatchEvent — if user starred a repo
+PublicEvent — repo made public
+ForkEvent — repo forked
+"""
