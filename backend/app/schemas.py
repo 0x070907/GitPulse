@@ -46,7 +46,7 @@ class GitHubEvent(BaseModel):
     type : Annotated[str,Field(description = "Event type")]
     created_at : str
     repo : Repo  #we only need repo["name"]
-    payload : dict  #this is polymorphic,hence the structure varies for different events
+    payload : dict = {}  #this is polymorphic,hence the structure varies for different events
 
 #this serves RepoStats
 class LanguageBreakdown(BaseModel):
@@ -63,6 +63,10 @@ class RepoStats(BaseModel):
     language_breakdown: list[LanguageBreakdown]
     top_repositories : list[RepoWithScore]
 
+class EventSummary(BaseModel):
+    event : GitHubEvent
+    time_ago : str
+    
 class DashBoardResponse(BaseModel):
     profile : GitHubUser
     repositories : list[RepoWithScore]

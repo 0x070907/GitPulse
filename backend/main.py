@@ -26,16 +26,24 @@ async def get_repos(username : str,
     return await fetch_repos(username,repo_type,per_page,sort)
 
 @app.get("/user/{username}/events",response_model=list[GitHubEvent])
-async def get_events(username : str,per_page : int = Query(default=100,gt=0,le=100)):
-    return await fetch_events(username,per_page)
+async def get_events(username : str,per_page : int = Query(default=100,gt=0,le=100),page : int = Query(default=1,gt = 0,le = 3)):
+    page1 =  await fetch_events(username)
+    
+    if len(page1) == 100:    
+            page2, page3 = await asyncio.gather(fetch_events(username,page = 2),fetch_events(username,page = 3))
+            return page1 + page2 + page3
+    return page1
 """
-
 #we'll fetch all data at once and analyse it
 @app.get("/analyse/{username}/dashboard",response_model = DashBoardResponse)
 async def analyse_profile(username : str):
     user, repos, events =  await asyncio.gather(fetch_user(username),fetch_repos(username),fetch_events(username))
     
-    stars ,forks = calculate_stars_and_forks(repos)
+    if len(events) == 100:    #the user is active and hence there is possibility of having events in page 2 and 3
+            page2, page3 = await asyncio.gather(fetch_events(username,page = 2),fetch_events(username,page = 3))
+            events += page2 + page3
+
+    stars, forks = calculate_stars_and_forks(repos)
 
     lang_analysis = calculate_language_breakdown(repos)
 

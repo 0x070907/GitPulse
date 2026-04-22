@@ -1,7 +1,21 @@
 from typing import Tuple
-from app.schemas import GitHubRepo,LanguageBreakdown,RepoWithScore
+from app.schemas import GitHubRepo,GitHubEvent,LanguageBreakdown,RepoWithScore,EventSummary
 from collections import Counter
 from datetime import datetime,timedelta,timezone
+
+
+# fallback values for unhandled action variants of events in get_event_impact function
+IMPACT_MAP = {
+        "PushEvent" :  2, 
+        "PullRequestEvent" : 2,   
+        "IssuesEvent" : 1,
+        "IssueCommentEvent" : 2,
+        "CreateEvent" : 1,
+        "DeleteEvent" : 1,          #they are all passive events
+        "ForkEvent" : 1,
+        "WatchEvent" : 0,      #if the user stars a repo/subscribes to notifications on
+        }
+
 
 def calculate_stars_and_forks(repos : list[GitHubRepo]) -> Tuple[int,int]:
     """Calculates the total stars and forks for original works."""
@@ -13,6 +27,7 @@ def calculate_stars_and_forks(repos : list[GitHubRepo]) -> Tuple[int,int]:
         total_stars +=  r.stars
 
     return total_stars,total_forks
+
 
 def calculate_language_breakdown(repos : list[GitHubRepo]) -> list[LanguageBreakdown]:
     """Optimized language analysis by aggregating primary language data and avoiding redundant API calls."""
@@ -30,7 +45,8 @@ def calculate_language_breakdown(repos : list[GitHubRepo]) -> list[LanguageBreak
         breakdown.append(LanguageBreakdown(language=lang, percentage=percentage))
 
     return sorted(breakdown, key=lambda l: l.percentage, reverse=True) # Sort by percentage descending
-    
+
+
 def is_recent(date_str : str) -> bool:
     date = datetime.fromisoformat(date_str.replace("Z", "+00:00"))  #The "Z" in the timestamp stands for UTC,so we parse it as such
     
@@ -39,6 +55,7 @@ def is_recent(date_str : str) -> bool:
     difference = now - date
     return difference < timedelta(days = 30)  
 
+
 def calculate_repo_quality_score(repos : list[GitHubRepo]) -> list[RepoWithScore]:
     """ Calculate repo_quality_score for each repo"""
     repos_with_scores = []
@@ -46,7 +63,7 @@ def calculate_repo_quality_score(repos : list[GitHubRepo]) -> list[RepoWithScore
     for repo in repos:
         score = 0
     
-        score += min(repo.stars * 5, 20) # 2 points per star,capped at 25
+        score += min(repo.stars * 5, 20) # 5 points per star,capped at 20
         score += min(repo.forks * 5,20)
         score += 10 if repo.description else 0
         score += 10 if is_recent(repo.updated_at) else 0
@@ -56,10 +73,76 @@ def calculate_repo_quality_score(repos : list[GitHubRepo]) -> list[RepoWithScore
 
         score = min(score,100) 
 
-        repos_with_scores.append(RepoWithScore(repo = repo,quality_score = score))
+        repos_with_scores.append(RepoWithScore(repo = repo,quality_score = int(score))) 
 
     return sorted(repos_with_scores,key = lambda r : r.quality_score,reverse=True)  #Sort the repos based on their scores
-    
+
+
 def get_top_repos(repos : list[RepoWithScore],n : int = 4) -> list[RepoWithScore]:
-    """Returns the top 4 repositories based on repo_quality_score"""
-    return repos[:n]
+    """Returns the top 4 original repositories based on repo_quality_score"""
+
+    original_repos = list(filter(lambda r : not r.repo.fork ,repos))
+    
+    if len(original_repos) < n :
+        return original_repos
+
+    return original_repos[:n]
+
+
+#this is needed for generating heatmap and activity stats
+def get_event_impact(event : GitHubEvent) -> int:
+    """Returns a weight from the payload to represent the volume of work"""
+
+    payload = event.payload
+    event_type = event.type 
+    
+    if event_type == "PushEvent":  #the data has many inconsistencies,size and commit fields may or may not be there
+
+        if "size" in payload:  #number of commits
+            return min(10,payload["size"] )  
+
+        elif payload.get("commits",[]) and isinstance(payload["commits"],list):    
+            return min(10,len(payload["commits"]))   #gives the commit count for that push; 50-commit push doesn't dominate the heatmap
+
+        else:
+            return 1
+
+    if event_type == "PullRequestEvent":   #Opening/merging PR shows more effort
+
+        if payload.get("pull_request",{}) and isinstance(payload["pull_request"],dict):
+            #action can be "opened","closed", "reopened" or "synchronize"(a commit pushed to open PR)
+            
+            if payload.get("action","") == "closed":
+                if payload["pull_request"]["merged"]:   #work was accepted 
+                    return 8                    
+                else:
+                    return 3                        #work was abandoned
+
+            elif payload.get("action","") == "opened":
+                return 4           #new contribution started
+
+            else:
+                return 2       
+
+    if event_type == "IssuesEvent":
+
+        action = payload.get("action","")
+        if action == "opened" or action == "closed":
+            return 4
+
+        elif action == "reopened":
+            return 2
+
+    if event_type == "CreateEvent":
+        #ref_type can be repository,branch or tag
+
+        if payload.get("ref_type","") == "repository":   #starting something new
+            return 4
+        
+        elif payload.get("ref_type","") == "tag":    #signals a release
+            return 3
+
+        elif payload.get("ref_type","") == "branch":
+            return 1   
+
+    return IMPACT_MAP.get(etype, 1)    #fallback for PublicEvent, MemberEvent, ReleaseEvent
