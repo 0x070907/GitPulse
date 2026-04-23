@@ -78,6 +78,19 @@ class EventSummary(BaseModel):
     event_type : str
     repository : str
     time_ago : str
+
+class CollaborationBreakdown(BaseModel):
+    pr_opened: int = 0
+    pr_merged: int = 0
+    issues: int = 0
+    comments: int = 0
+    pushes : int = 0
+
+class CollaborationScore(BaseModel):
+    score: int
+    badge: str
+    color: str  # Hex code for the badge color
+    breakdown: CollaborationBreakdown
     
 class ActivityInsights(BaseModel):
     most_active_day: str
@@ -90,3 +103,4 @@ class DashBoardResponse(BaseModel):
     repositories : list[RepoWithScore]
     repo_stats: RepoStats
     activity_insights: ActivityInsights
+    collaboration_score : CollaborationScore

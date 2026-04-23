@@ -53,8 +53,11 @@ async def analyse_profile(username : str):
     top_repos = get_top_repos(repos_with_scores)
 
     activity_stats = analyse_activity(events)
+
+    collab_score = calculate_collaboration_score(events, username, repos)
     
     return DashBoardResponse(profile = user,
                             repositories = repos_with_scores,
                             repo_stats = RepoStats(total_stars = stars,total_forks = forks,language_breakdown = lang_analysis,top_repositories = top_repos),
-                            activity_insights = activity_stats)
+                            activity_insights = activity_stats,
+                            collaboration_score = collab_score)
