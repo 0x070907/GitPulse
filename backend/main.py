@@ -1,10 +1,13 @@
 from fastapi import FastAPI,Path,Query
 from typing import Annotated,Literal
 from app.github_client import fetch_user,fetch_repos,fetch_all_events
-from app.schemas import GitHubUser, GitHubRepo, GitHubEvent, RepoStats, DashBoardResponse
+from app.schemas import RepoStats, DashBoardResponse,ReadmeRequest,ReadmeResponse,Options
 from app.utils.repo_utils import calculate_stars_and_forks, calculate_language_breakdown, calculate_repo_quality_score, get_top_repos
 from app.utils.event_utils import analyse_activity
 from app.utils.score_utils import calculate_collaboration_score,calculate_profile_score,get_profile_actionable_tip
+from app.utils.readme_utils import generate_readme
+from app.lib.social_links import SOCIAL_BADGE_MAP
+from app.lib.tech_stack import STACK_BADGE_MAP
 import asyncio
 
 app = FastAPI(title="GitPulse")
@@ -13,31 +16,9 @@ app = FastAPI(title="GitPulse")
 def health():
     return {"status" : "ok","message":"GitPulse is running"}  
 
-#These routes are working perfect individually when tested,now we can combine them using asyncio.gather()
-
-@app.get("/user/{username}",response_model = GitHubUser )
-async def get_user( username : Annotated[str,Path(description="Enter a github username")] ):
-    return await fetch_user(username)
-
-@app.get("/user/{username}/repos",response_model = list[GitHubRepo])
-async def get_repos(username : str,
-                    repo_type : str = "owner",
-                    per_page : int = Query(default=100,gt=0,le=100),
-                    sort : Literal["created","updated","full_name","pushed"] = "updated"):
-    return await fetch_repos(username,repo_type,per_page,sort)
-
-@app.get("/user/{username}/events",response_model=list[GitHubEvent])
-async def get_events(username : str,per_page : int = Query(default=100,gt=0,le=100),page : int = Query(default=1,gt = 0,le = 3)):
-    page1 =  await fetch_events(username)
-    
-    if len(page1) == 100:    
-            page2, page3 = await asyncio.gather(fetch_events(username,page = 2),fetch_events(username,page = 3))
-            return page1 + page2 + page3
-    return page1
-
 
 #we'll fetch all data at once and analyse it
-@app.get("/analyse/{username}/dashboard",response_model = DashBoardResponse)
+@app.get("/user/{username}/dashboard",response_model = DashBoardResponse)
 async def analyse_profile(username : str):
     user, repos, events =  await asyncio.gather(fetch_user(username),fetch_repos(username),fetch_all_events(username))
 
@@ -64,3 +45,19 @@ async def analyse_profile(username : str):
                             collaboration_score = collab_score,
                             profile_score = profile_score_data,
                             actionable_tip = actionable_tip)
+
+
+# frontend calls this endpoint once when it loads the README config page
+# then uses the data to render the category sections with toggle buttons and the theme dropdown
+@app.get("/user/readme/options",response_model=Options)             
+def get_options():
+    return Options(tech_stack = {category : list(item.keys()) for category,item in STACK_BADGE_MAP.items()},
+                    social_links =  [platform for platform in SOCIAL_BADGE_MAP.keys()],
+                    themes = ["default", "dark", "github_dark", "midnight-purple", "rose", "blue_navy"]
+                    )
+
+#generates the md string based on the form inputs and toggle states           
+@app.post("/user/{username}/readme",response_model= ReadmeResponse)
+def create_readme(username : str,request : ReadmeRequest):
+    profile_readme = generate_readme(username,request)
+    return ReadmeResponse(markdown = profile_readme,username = username)
