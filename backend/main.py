@@ -1,18 +1,36 @@
 from fastapi import FastAPI,Path,Query
+from fastapi.middleware.cors import CORSMiddleware
+
 from typing import Annotated,Literal
+
 from app.github_client import fetch_user,fetch_repos,fetch_all_events
 from app.schemas import RepoStats, DashBoardResponse,ReadmeRequest,ReadmeResponse,Options
+
 from app.utils.repo_utils import calculate_stars_and_forks, calculate_language_breakdown, calculate_repo_quality_score, get_top_repos
 from app.utils.event_utils import analyse_activity
 from app.utils.score_utils import calculate_collaboration_score,calculate_profile_score,get_profile_actionable_tip
 from app.utils.readme_utils import generate_readme
+
 from app.lib.social_links import SOCIAL_BADGE_MAP
 from app.lib.tech_stack import STACK_BADGE_MAP
+
 import asyncio
 
 app = FastAPI(title="GitPulse")
 
-@app.get("/")
+#required to connect fastapi and vite
+app.add_middleware(
+                    CORSMiddleware,
+                    allow_origins=[
+                        "http://localhost:5173",
+                        "http://localhost:3000",
+                        "https://*.vercel.app",
+                    ],
+                    allow_methods=["*"],
+                    allow_headers=["*"],
+                    )
+
+@app.get("/health")
 def health():
     return {"status" : "ok","message":"GitPulse is running"}  
 
