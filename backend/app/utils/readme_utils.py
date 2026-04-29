@@ -24,6 +24,9 @@ def build_header(username: str, role: Optional[str], open_to_work: bool) -> str:
 
     if open_to_work:
         lines.append(quote_plus("Available for Opportunities"))
+
+    if not lines:
+        lines.append(quote_plus(f"Welcome to my profile"))  # fallback so url is never empty
     
     lines_param = ";".join(lines)     #New lines are seperated by ;
 
@@ -33,19 +36,20 @@ def build_header(username: str, role: Optional[str], open_to_work: bool) -> str:
         f'</p>'
     )
 
-def build_about(bio_text: Optional[str], interests: Optional[str]) -> list[str]:
+def build_about(bio_text: Optional[str], interests: Optional[str]) -> tuple[str,str]:
     """Bio paragraph and interests"""
-    res = []
- 
-    if bio_text:
-        res.append(f"### About Me\n\n{bio_text.strip()}")
- 
-    if interests:
-        items = [interest.strip() for interest in interests.split(".") if interest.strip()]         #We'll ask user to split the points by fullstop
-        formatted_interests = "\n".join([f"- {item}" for item in items])
-        res.append(f"**Interests:**\n\n{formatted_interests}")
+    
+    bio = f"### About Me\n\n{bio_text.strip()}" if bio_text else ""
 
-    return res
+    if interests:
+        items = [item.strip() for item in interests.split(".") if item.strip()]
+        formatted_interests = "\n".join(f"- {item}" for item in items)
+        interests_section = f"**Interests:**\n\n{formatted_interests}"
+
+    else:
+        interests_section = ""
+
+    return bio, interests_section
 
 
 def build_language_badges(selected_stack: list[str], include: bool) -> str:
@@ -141,7 +145,7 @@ def build_social_links(twitter : Optional[str], blog : Optional[str], social_lin
         if details:
             bg, logo = details
             badge_url = f"https://img.shields.io/badge/{quote_plus(link.platform)}-{bg}?style=for-the-badge&logo={logo}&logoColor=white"
-            badges.append(f'<a href="{link.url}"><img src="{url}" height = "35"/></a>')
+            badges.append(f'<a href="{link.url}"><img src="{badge_url}" height = "35"/></a>')
 
     if not badges:
         return ""
@@ -153,8 +157,8 @@ def build_score_section(profile_score : int, collaboration_badge : str, include 
     if not include:
         return ""
     
-    score_badge = f"![Profile Score](https://img.shields.io/badge/Profile%20Score-{profile_score}%2F100-7851A9)?style=for-the-badge"      # / is parsed as %2F
-    collab_badge = f"![Collaboration](https://img.shields.io/badge/Status-{quote_plus(collaboration_badge)}-2ea043)?style=for-the-badge"
+    score_badge = f"![Profile Score](https://img.shields.io/badge/Profile%20Score-{profile_score}%2F100-7851A9?style=for-the-badge)"      # / is parsed as %2F
+    collab_badge = f"![Collaboration](https://img.shields.io/badge/Status-{quote_plus(collaboration_badge)}-2ea043?style=for-the-badge)"
     
     return "### Profile Score \n\n" + f"{score_badge}   {collab_badge}"
 
@@ -178,7 +182,7 @@ def build_profile_views(username: str, include: bool) -> str:
  
     url = f"https://komarev.com/ghpvc/?username={username}&label=Profile+Views&color=58A6FF&style=for-the-badge"
     
-    return f'<div align = "center">\n\n<img height="160" src="{url}" alt="Profile Views" />\n\n'
+    return f'<div align = "center">\n\n<img height="160" src="{url}" alt="Profile Views" />\n\n</div>'
 
 
 def build_fun_fact(fun_fact: Optional[str]) -> str:
@@ -195,7 +199,7 @@ def build_quote(quote: Optional[str]) -> str:
 #Note:
 #the markdown string in the response would look messy bcz of raw html tags and escape characters
 # once that string is passed to a frontend component that understands markdown,it renders as a clean, formatted document
-
+# rn nothing can be done to see the alignment,so we can review this function after frontend is ready
 def generate_readme(username: str, request: ReadmeRequest) -> str:
     # 1. Typing SVG
     typing_header = build_header(username, request.role, request.open_to_work)
