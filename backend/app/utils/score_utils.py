@@ -8,7 +8,9 @@ def calculate_collaboration_score(events: list[GitHubEvent], username: str, repo
 
     social_points = 0
     push_points = 0      #In order to avoid dominance of push events alone
-    
+    pr_points     = 0     
+    issue_points  = 0 
+
     forked_repos = {repo.name for repo in repos if repo.fork}
 
     for event in events:
@@ -34,26 +36,29 @@ def calculate_collaboration_score(events: list[GitHubEvent], username: str, repo
             push_points += (5 * multiplier)
             breakdown.pushes += 1
 
-        if event_type == "PullRequestEvent":
+        elif event_type == "PullRequestEvent":
             if payload.action == "opened":
-                social_points += (15 * multiplier)
+                pr_points += (15 * multiplier)
                 breakdown.pr_opened += 1
-            
+ 
             if payload.pull_request and payload.pull_request.merged:    # Merged check
-                social_points += (20 * multiplier)
+                pr_points += (20 * multiplier)
                 breakdown.pr_merged += 1
-                
-        elif event_type == "IssuesEvent":
+ 
+        elif event_type == "IssuesEvent" and not is_own_repo:     # External only — own-repo issue management isn't collaboration
             if payload.action in ["opened", "closed"]:
-                social_points += (5 * multiplier)
+                issue_points += (3 * multiplier)                  
                 breakdown.issues += 1
-                
-        elif event_type == "IssueCommentEvent":
-            social_points += (2 * multiplier)
+ 
+        elif event_type == "IssueCommentEvent" and not is_own_repo:
+            issue_points += (2 * multiplier)
             breakdown.comments += 1
-
-    final_push_score = min(30, int(push_points))          #Cap Push Points at 30% of the maximum possible score
-    final_score = min(100, int(final_push_score + social_points))    # Cap at 100
+ 
+    final_push_score  = min(30, int(push_points))   # max 30 pts from pushes
+    final_issue_score = min(20, int(issue_points))  # max 20 pts from issues
+    final_pr_score    = min(60, int(pr_points))     # max 60 pts from PRs - which shows a good sign of collaboration
+    
+    final_score = min(100, final_push_score + final_issue_score + final_pr_score)
     
     # Badge Mapping
     if final_score >= 80:

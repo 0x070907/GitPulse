@@ -120,22 +120,22 @@ class SocialLink(BaseModel):
 
 class ReadmeRequest(BaseModel):
     # Pre-filled from dashboard — frontend sends back what it already has
-    name : str
-    bio_text : str
-    top_repos: list[str]          # just repo names, top 3
-    primary_languages : list[str]
-    profile_score: int
-    collaboration_badge: str
-    interests : str
-
+    name: Annotated[str, Field(min_length=1, max_length=100)]
+    bio_text: Annotated[str, Field(max_length=300)]
+    top_repos: Annotated[list[str], Field(max_length=5)]        # dashboard only gives top 3
+    primary_languages: list[str]
+    profile_score: Annotated[int, Field(ge=0, le=100)]          # it's a score, must be 0–100
+    collaboration_badge: Literal["Top Contibutor", "Active Collaborator", "Building Momentum", "Solo Developer"]
+    
     # Tech stack — all checked items as one flat list
     tech_stack: list[str] = []
 
     # Optional personal fields
     role: Annotated[Optional[str],Field(max_length=100)] = None
     open_to_work: bool = False
-    fun_fact: Optional[str] = None
-    quote: Optional[str] = None
+    interests: Annotated[str, Field(max_length=200)]
+    fun_fact: Annotated[Optional[str], Field(max_length=200)] = None
+    quote: Annotated[Optional[str], Field(max_length=200)] = None
 
     # Social — pre-filled from GitHub data + user additions
     twitter: Optional[str] = None
@@ -143,7 +143,7 @@ class ReadmeRequest(BaseModel):
     social_links: list[SocialLink] = []
 
     #theme for stats card and streak card
-    theme : str = "dark"
+    theme: Literal["default", "dark", "github_dark", "midnight-purple", "rose", "blue_navy"] = "dark"
 
     # Toggle states — which sections to include
     include_stats_card: bool = True
